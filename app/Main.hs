@@ -8,6 +8,7 @@ import Data.Map (empty)
 import Data.Maybe (fromMaybe)
 import Data.Parameterized (sndPair, viewSome)
 import Data.Text (unpack)
+import Data.Tuple.Extra (snd3, thd3)
 import Elf.Elf
 import Elf.Types (EiData (..), Elf (..))
 import Emulator (Memory, PC, Registers, run, setMem)
@@ -43,4 +44,4 @@ main = do
       print c
       let w = concatMap (fromMaybe undefined . asBytesLE (knownNat @Size)) c
       let mem = setMem initMem (zero (knownNat @Size)) w
-      print $ run (mem, initRegs, initPC)
+      mapM_ (print . \s -> (snd3 s, thd3 s)) $ run (mem, initRegs, initPC)

@@ -43,7 +43,7 @@ executable haskell-riscv-emulator
                     , lens ==5.2.3
                     , parameterized-utils ==2.1.7.0
                     , containers ==0.6.5.1
-                    , safe ==0.3.19
+                    , extra ==1.7.14
 
     hs-source-dirs:   app
 

@@ -10,7 +10,10 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Data.Parameterized (Pair, Some, sndPair, viewSome)
+import Data.Text (Text, unpack)
+import Data.Tuple.Extra (uncurry3)
 import Data.Word (Word8)
+import Disassembler.Disassembler (decode)
 import Instructions (Immediate, Instruction (..), Size, size)
 import Registers (Register)
 
@@ -53,23 +56,23 @@ setReg rs r v = M.insert r v rs
 incPC :: PC -> PC
 incPC pc = BV.add (knownNat @Size) pc $ mkBV (knownNat @Size) $ size `div` 8
 
-run :: Instruction -> [Register] -> [Immediate] -> State -> State
-run LUI [rd] [imm] (m, rs, pc) =
+runInstruction :: State -> Instruction -> [Register] -> [Immediate] -> State
+runInstruction (m, rs, pc) LUI [rd] [imm] =
   ( m,
     setReg rs rd imm,
     incPC pc
   )
-run AUIPC [rd] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) AUIPC [rd] [imm] =
   ( m,
     setReg rs rd $ BV.add (knownNat @Size) pc imm,
     incPC pc
   )
-run JAL [rd] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) JAL [rd] [imm] =
   ( m,
     setReg rs rd $ incPC pc,
     BV.add (knownNat @32) pc imm
   )
-run JALR [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) JALR [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ incPC pc,
     BV.add
@@ -79,56 +82,56 @@ run JALR [rd, rs1] [imm] (m, rs, pc) =
       $ BV.add (knownNat @Size) imm
       $ getReg rs rs1
   )
-run BEQ [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BEQ [rs1, rs2] [imm] =
   ( m,
     rs,
     if getReg rs rs1 == getReg rs rs2
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BNE [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BNE [rs1, rs2] [imm] =
   ( m,
     rs,
     if getReg rs rs1 /= getReg rs rs2
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BLT [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BLT [rs1, rs2] [imm] =
   ( m,
     rs,
     if BV.slt (knownNat @Size) (getReg rs rs1) (getReg rs rs2)
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BLT [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BLT [rs1, rs2] [imm] =
   ( m,
     rs,
     if BV.slt (knownNat @Size) (getReg rs rs1) (getReg rs rs2)
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BGE [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BGE [rs1, rs2] [imm] =
   ( m,
     rs,
     if not $ BV.slt (knownNat @Size) (getReg rs rs1) (getReg rs rs2)
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BLTU [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BLTU [rs1, rs2] [imm] =
   ( m,
     rs,
     if BV.ult (getReg rs rs1) (getReg rs rs2)
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run BGEU [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) BGEU [rs1, rs2] [imm] =
   ( m,
     rs,
     if not $ BV.ult (getReg rs rs1) (getReg rs rs2)
       then BV.add (knownNat @Size) imm pc
       else incPC pc
   )
-run LB [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) LB [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.sext (knownNat @8) (knownNat @Size) $
@@ -138,7 +141,7 @@ run LB [rd, rs1] [imm] (m, rs, pc) =
               getReg rs rs1,
     incPC pc
   )
-run LH [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) LH [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.sext (knownNat @16) (knownNat @Size) $
@@ -148,7 +151,7 @@ run LH [rd, rs1] [imm] (m, rs, pc) =
               getReg rs rs1,
     incPC pc
   )
-run LW [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) LW [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       viewSomeBV (knownNat @Size) $
@@ -157,7 +160,7 @@ run LW [rd, rs1] [imm] (m, rs, pc) =
             getReg rs rs1,
     incPC pc
   )
-run LBU [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) LBU [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.zext (knownNat @Size) $
@@ -167,7 +170,7 @@ run LBU [rd, rs1] [imm] (m, rs, pc) =
               getReg rs rs1,
     incPC pc
   )
-run LHU [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) LHU [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.zext (knownNat @Size) $
@@ -177,7 +180,7 @@ run LHU [rd, rs1] [imm] (m, rs, pc) =
               getReg rs rs1,
     incPC pc
   )
-run SB [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SB [rs1, rs2] [imm] =
   ( setMem
       m
       (BV.add (knownNat @Size) imm $ getReg rs rs1)
@@ -189,7 +192,7 @@ run SB [rs1, rs2] [imm] (m, rs, pc) =
     rs,
     incPC pc
   )
-run SH [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SH [rs1, rs2] [imm] =
   ( setMem
       m
       (BV.add (knownNat @Size) imm $ getReg rs rs1)
@@ -201,7 +204,7 @@ run SH [rs1, rs2] [imm] (m, rs, pc) =
     rs,
     incPC pc
   )
-run SW [rs1, rs2] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SW [rs1, rs2] [imm] =
   ( setMem
       m
       (BV.add (knownNat @Size) imm $ getReg rs rs1)
@@ -212,65 +215,65 @@ run SW [rs1, rs2] [imm] (m, rs, pc) =
     rs,
     incPC pc
   )
-run ADDI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) ADDI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ BV.add (knownNat @Size) (getReg rs rs1) imm,
     incPC pc
   )
-run SLTI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SLTI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ if BV.slt (knownNat @Size) (getReg rs rs1) imm then one else zero,
     incPC pc
   )
-run SLTIU [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SLTIU [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ if BV.ult (getReg rs rs1) imm then one else zero,
     incPC pc
   )
-run XORI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) XORI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ BV.xor (getReg rs rs1) imm,
     incPC pc
   )
-run ANDI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) ANDI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ BV.and (getReg rs rs1) imm,
     incPC pc
   )
-run ORI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) ORI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $ BV.or (getReg rs rs1) imm,
     incPC pc
   )
-run SLLI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SLLI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.shl (knownNat @Size) (getReg rs rs1) (fromIntegral $ asUnsigned imm),
     incPC pc
   )
-run SRLI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SRLI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.lshr (knownNat @Size) (getReg rs rs1) (fromIntegral $ asUnsigned imm),
     incPC pc
   )
-run SRAI [rd, rs1] [imm] (m, rs, pc) =
+runInstruction (m, rs, pc) SRAI [rd, rs1] [imm] =
   ( m,
     setReg rs rd $
       BV.ashr (knownNat @Size) (getReg rs rs1) (fromIntegral $ asUnsigned imm),
     incPC pc
   )
-run ADD [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) ADD [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ BV.add (knownNat @Size) (getReg rs rs1) (getReg rs rs2),
     incPC pc
   )
-run SUB [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SUB [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ BV.sub (knownNat @Size) (getReg rs rs1) (getReg rs rs2),
     incPC pc
   )
-run SLL [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SLL [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $
       BV.shl
@@ -279,7 +282,7 @@ run SLL [rd, rs1, rs2] [] (m, rs, pc) =
         (fromIntegral $ asUnsigned $ truncBits 5 $ getReg rs rs2),
     incPC pc
   )
-run SLT [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SLT [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $
       if BV.slt (knownNat @Size) (getReg rs rs1) (getReg rs rs2)
@@ -287,17 +290,17 @@ run SLT [rd, rs1, rs2] [] (m, rs, pc) =
         else zero,
     incPC pc
   )
-run SLTU [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SLTU [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ if BV.ult (getReg rs rs1) (getReg rs rs2) then one else zero,
     incPC pc
   )
-run XOR [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) XOR [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ BV.xor (getReg rs rs1) (getReg rs rs2),
     incPC pc
   )
-run SRL [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SRL [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $
       BV.lshr
@@ -306,7 +309,7 @@ run SRL [rd, rs1, rs2] [] (m, rs, pc) =
         (fromIntegral $ asUnsigned $ truncBits 5 $ getReg rs rs2),
     incPC pc
   )
-run SRA [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) SRA [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $
       BV.ashr
@@ -315,17 +318,30 @@ run SRA [rd, rs1, rs2] [] (m, rs, pc) =
         (fromIntegral $ asUnsigned $ truncBits 5 $ getReg rs rs2),
     incPC pc
   )
-run AND [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) AND [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ BV.and (getReg rs rs1) (getReg rs rs2),
     incPC pc
   )
-run OR [rd, rs1, rs2] [] (m, rs, pc) =
+runInstruction (m, rs, pc) OR [rd, rs1, rs2] [] =
   ( m,
     setReg rs rd $ BV.or (getReg rs rs1) (getReg rs rs2),
     incPC pc
   )
-run FENCE _ _ _ = undefined
-run ECALL [] [] (m, rs, pc) = error $ show m <> "\n" <> show rs <> "\n" <> show pc
-run EBREAK _ _ _ = undefined
-run _ _ _ _ = undefined
+runInstruction _ FENCE _ _ = undefined
+runInstruction (m, rs, pc) ECALL [] [] =
+  error $
+    show m <> "\n" <> show rs <> "\n" <> show pc
+runInstruction _ EBREAK _ _ = undefined
+runInstruction _ _ _ _ = undefined
+
+readNextInstruction :: State -> Either Text (Instruction, [Register], [Immediate])
+readNextInstruction (m, _, pc) =
+  decode $
+    viewSomeBV (knownNat @Size) $
+      getMem (bytestringLE . toStrict) m 4 pc
+
+run :: State -> [State]
+run s = (:) s $ run $ uncurry3 (runInstruction s) $ case readNextInstruction s of
+  Left e -> error $ unpack e
+  Right a -> a

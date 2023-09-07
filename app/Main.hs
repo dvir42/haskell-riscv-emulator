@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad (void)
 import Data.BitVector.Sized
 import Data.ByteString.Lazy (ByteString, toStrict)
 import qualified Data.ByteString.Lazy as BS
@@ -8,11 +9,10 @@ import Data.Map (empty)
 import Data.Maybe (fromMaybe)
 import Data.Parameterized (sndPair, viewSome)
 import Data.Text (unpack)
-import Data.Tuple.Extra (snd3, thd3)
 import Elf.Elf
 import Elf.Types (EiData (..), Elf (..))
 import Emulator.Emulator (run)
-import Emulator.State (Memory, PC, Registers, setMem)
+import Emulator.State (Endianness (BE, LE), Memory, PC, Params (Params, endianness), Registers, setMem)
 import Instructions (Size, size)
 
 bsChunks :: Int64 -> ByteString -> [ByteString]
@@ -40,12 +40,16 @@ main = do
   e <- elfContents "/home/dvir/code/riscv/hello"
   case e of
     Left err -> error $ "error getting elf contents: " <> unpack err
-    Right elf -> do
+    Right elf@(Elf _ d _) -> do
       let bytes =
             concatMap
               (fromMaybe undefined . asBytesLE (knownNat @Size))
               $ code elf
       let mem = setMem initMem (zero (knownNat @Size)) bytes
-      s <- run (mem, initRegs, initPC)
-      print $ snd3 $ last s
-      print $ thd3 $ last s
+      let params =
+            Params
+              { endianness = case d of
+                  ElfData2Msb -> BE
+                  ElfData2Lsb -> LE
+              }
+      void $ run (mem, initRegs, initPC, params)

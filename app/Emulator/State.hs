@@ -22,7 +22,11 @@ type Registers = Map Register (BV Size)
 
 type PC = BV Size
 
-type State = (Memory, Registers, PC)
+data Endianness = BE | LE
+
+newtype Params = Params {endianness :: Endianness}
+
+type State = (Memory, Registers, PC, Params)
 
 zero :: BV Size
 zero = BV.zero $ knownNat @Size

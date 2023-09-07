@@ -11,7 +11,7 @@ import System.Exit (ExitCode (ExitFailure, ExitSuccess), exitWith)
 import System.Posix.ByteString (Fd (Fd), fdRead, fdWrite)
 
 sread :: State -> IO Memory
-sread (m, rs, _) = do
+sread (m, rs, _, _) = do
   let fd = fromIntegral $ asUnsigned $ getReg rs A0
   let buf = getReg rs A1
   let count = fromIntegral $ asUnsigned $ getReg rs A2
@@ -19,7 +19,7 @@ sread (m, rs, _) = do
   return $ setMem m buf $ BS.unpack string
 
 swrite :: State -> IO ()
-swrite (m, rs, _) = do
+swrite (m, rs, _, _) = do
   let fd = fromIntegral $ asUnsigned $ getReg rs A0
   let buf = fromIntegral $ asUnsigned $ getReg rs A1
   let count = fromIntegral $ asUnsigned $ getReg rs A2
@@ -28,15 +28,15 @@ swrite (m, rs, _) = do
   return ()
 
 sexit :: State -> IO ()
-sexit (_, rs, _) = do
+sexit (_, rs, _, _) = do
   let error_code = fromIntegral $ asSigned (knownNat @Size) $ getReg rs A0
   exitWith $ if error_code == 0 then ExitSuccess else ExitFailure error_code
 
 runCall :: State -> IO State
-runCall s@(m, rs, pc) = case asUnsigned $ getReg rs A7 of
+runCall s@(m, rs, pc, p) = case asUnsigned $ getReg rs A7 of
   63 -> do
     nm <- sread s
-    return (nm, rs, incPC pc)
-  64 -> do swrite s; return (m, rs, incPC pc)
-  93 -> do sexit s; return (m, rs, incPC pc)
+    return (nm, rs, incPC pc, p)
+  64 -> do swrite s; return (m, rs, incPC pc, p)
+  93 -> do sexit s; return (m, rs, incPC pc, p)
   i -> error $ "undefined syscall: " <> show i

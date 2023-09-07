@@ -11,6 +11,7 @@ import Emulator.State
 import Emulator.Syscalls (runCall)
 import Instructions (Immediate, Instruction (..), Size)
 import Registers
+import Types
 
 runInstruction :: State -> Instruction -> [Register] -> [Immediate] -> IO State
 runInstruction (m, rs, pc, p) LUI [rd] [imm] =

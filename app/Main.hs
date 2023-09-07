@@ -10,21 +10,26 @@ import Data.Maybe (fromMaybe)
 import Data.Parameterized (sndPair, viewSome)
 import Data.Text (unpack)
 import Elf.Elf
-import Elf.Types (EiData (..), Elf (..))
+import Elf.Types (Elf (..))
 import Emulator.Emulator (run)
-import Emulator.State (Endianness (BE, LE), Memory, PC, Params (Params, endianness), Registers, setMem)
+import Emulator.State (Memory, PC, Params (Params, endianness), Registers, setMem)
 import Instructions (Size, size)
+import Types
 
 bsChunks :: Int64 -> ByteString -> [ByteString]
 bsChunks _ "" = []
 bsChunks n bs = BS.take n bs : bsChunks n (BS.drop n bs)
 
 code :: Elf -> [BV Size]
-code e@(Elf _ d _) = map (viewSome (\(BV n) -> mkBV (knownNat @Size) n) . sndPair . construct) $ bsChunks (fromIntegral size `div` 8) $ elfTextSection e
+code e@(Elf _ d _) =
+  map
+    (viewSome (\(BV n) -> mkBV (knownNat @Size) n) . sndPair . construct)
+    $ bsChunks (fromIntegral size `div` 8)
+    $ elfTextSection e
   where
     construct = case d of
-      ElfData2Lsb -> bytestringLE . toStrict
-      ElfData2Msb -> bytestringBE . toStrict
+      LE -> bytestringLE . toStrict
+      BE -> bytestringBE . toStrict
 
 initMem :: Memory
 initMem = BS.replicate 1024 0
@@ -46,10 +51,5 @@ main = do
               (fromMaybe undefined . asBytesLE (knownNat @Size))
               $ code elf
       let mem = setMem initMem (zero (knownNat @Size)) bytes
-      let params =
-            Params
-              { endianness = case d of
-                  ElfData2Msb -> BE
-                  ElfData2Lsb -> LE
-              }
+      let params = Params {endianness = d}
       void $ run (mem, initRegs, initPC, params)

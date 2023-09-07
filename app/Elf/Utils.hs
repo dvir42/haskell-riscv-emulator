@@ -6,44 +6,41 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Int (Int64)
 import Data.Word (Word16, Word32)
 import Elf.Types
+import Types
 
-eiClass :: ByteString -> EiClass
+eiClass :: ByteString -> Architecture
 eiClass e = case BS.index e 4 of
-  1 -> ElfClass32
-  2 -> ElfClass64
+  1 -> A32
+  2 -> A64
   _ -> undefined
 
-eiData :: ByteString -> EiData
+eiData :: ByteString -> Endianness
 eiData e = case BS.index e 5 of
-  1 -> ElfData2Lsb
-  2 -> ElfData2Msb
+  1 -> LE
+  2 -> BE
   _ -> undefined
 
-eiClassToInt :: EiClass -> Int64
-eiClassToInt ElfClass32 = 32
-eiClassToInt ElfClass64 = 64
-
-getUint16From :: EiData -> Int64 -> ByteString -> Word16
+getUint16From :: Endianness -> Int64 -> ByteString -> Word16
 getUint16From d i e = case d of
-  ElfData2Lsb -> runGet getWord16le w
-  ElfData2Msb -> runGet getWord16be w
+  LE -> runGet getWord16le w
+  BE -> runGet getWord16be w
   where
     w = BS.take (16 `div` 8) $ BS.drop i e
 
-getUint32From :: EiData -> Int64 -> ByteString -> Word32
+getUint32From :: Endianness -> Int64 -> ByteString -> Word32
 getUint32From d i e = case d of
-  ElfData2Lsb -> runGet getWord32le w
-  ElfData2Msb -> runGet getWord32be w
+  LE -> runGet getWord32le w
+  BE -> runGet getWord32be w
   where
     w = BS.take (32 `div` 8) $ BS.drop i e
 
-getUintClassFrom :: EiClass -> EiData -> Int64 -> ByteString -> Either3264
+getUintClassFrom :: Architecture -> Endianness -> Int64 -> ByteString -> Either3264
 getUintClassFrom c d i e = case c of
-  ElfClass32 -> case d of
-    ElfData2Lsb -> E32 $ runGet getWord32le w
-    ElfData2Msb -> E32 $ runGet getWord32be w
-  ElfClass64 -> case d of
-    ElfData2Lsb -> E64 $ runGet getWord64le w
-    ElfData2Msb -> E64 $ runGet getWord64be w
+  A32 -> case d of
+    LE -> E32 $ runGet getWord32le w
+    BE -> E32 $ runGet getWord32be w
+  A64 -> case d of
+    LE -> E64 $ runGet getWord64le w
+    BE -> E64 $ runGet getWord64be w
   where
-    w = BS.take (eiClassToInt c `div` 8) $ BS.drop i e
+    w = BS.take (architectureToInt c `div` 8) $ BS.drop i e

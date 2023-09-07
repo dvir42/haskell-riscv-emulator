@@ -13,6 +13,7 @@ import Data.Parameterized (Pair, Some, sndPair, viewSome)
 import Data.Word (Word8)
 import Instructions
 import Registers
+import Types
 
 type Address = BV Size
 
@@ -21,8 +22,6 @@ type Memory = ByteString
 type Registers = Map Register (BV Size)
 
 type PC = BV Size
-
-data Endianness = BE | LE
 
 newtype Params = Params {endianness :: Endianness}
 

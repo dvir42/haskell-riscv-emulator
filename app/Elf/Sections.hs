@@ -9,6 +9,7 @@ import Data.Word (Word16, Word32)
 import Elf.Header
 import Elf.Types
 import Elf.Utils
+import Types
 
 shName :: Elf -> Word16 -> Text
 shName elf@(Elf _ d e) n =
@@ -31,13 +32,13 @@ shType elf@(Elf _ d e) n =
 
 shOffset :: Elf -> Word16 -> Either3264
 shOffset elf@(Elf c d e) n =
-  getUintClassFrom c d (fromIntegral (offset n) + 4 + 4 + (eiClassToInt c `div` 8) * 2) e
+  getUintClassFrom c d (fromIntegral (offset n) + 4 + 4 + (architectureToInt c `div` 8) * 2) e
   where
     offset i = eShoff elf + fromIntegral (i * eShentSize elf)
 
 shSize :: Elf -> Word16 -> Either3264
 shSize elf@(Elf c d e) n =
-  getUintClassFrom c d (fromIntegral (offset n) + 4 + 4 + (eiClassToInt c `div` 8) * 3) e
+  getUintClassFrom c d (fromIntegral (offset n) + 4 + 4 + (architectureToInt c `div` 8) * 3) e
   where
     offset i = eShoff elf + fromIntegral (i * eShentSize elf)
 

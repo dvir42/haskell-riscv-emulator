@@ -36,6 +36,7 @@ executable haskell-riscv-emulator
                     , Emulator.Syscalls
                     , Instructions
                     , Registers
+                    , Types
 
     build-depends:    base ^>=4.16.4.0
                     , bv-sized ==1.0.5

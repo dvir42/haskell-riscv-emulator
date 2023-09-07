@@ -5,12 +5,9 @@ import Data.ByteString.Builder (byteStringHex)
 import Data.ByteString.Lazy (ByteString, toStrict)
 import Data.Int (Int32, Int64)
 import Data.Word (Word32, Word64)
+import Types
 
-data EiClass = ElfClass32 | ElfClass64 deriving (Show)
-
-data EiData = ElfData2Lsb | ElfData2Msb deriving (Show)
-
-data Elf = Elf EiClass EiData ByteString
+data Elf = Elf Architecture Endianness ByteString
 
 instance Show Elf where
   show (Elf c d e) =

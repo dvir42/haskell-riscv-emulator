@@ -3,7 +3,7 @@ module Disassembler.Disassembler (decode) where
 import Data.BitVector.Sized
 import qualified Data.BitVector.Sized as BV
 import Data.Proxy
-import Data.Text (Text, pack, toLower)
+import Data.Text (Text)
 import Disassembler.Instructions
 import Disassembler.Registers
 import GHC.TypeNats (natVal)

@@ -31,7 +31,9 @@ executable haskell-riscv-emulator
                     , Elf.Sections
                     , Elf.Types
                     , Elf.Utils
-                    , Emulator
+                    , Emulator.Emulator
+                    , Emulator.State
+                    , Emulator.Syscalls
                     , Instructions
                     , Registers
 
@@ -44,6 +46,8 @@ executable haskell-riscv-emulator
                     , parameterized-utils ==2.1.7.0
                     , containers ==0.6.5.1
                     , extra ==1.7.14
+                    , monad-loops ==0.4.3
+                    , unix ==2.8.1.1
 
     hs-source-dirs:   app
 

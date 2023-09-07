@@ -11,7 +11,8 @@ import Data.Text (unpack)
 import Data.Tuple.Extra (snd3, thd3)
 import Elf.Elf
 import Elf.Types (EiData (..), Elf (..))
-import Emulator (Memory, PC, Registers, run, setMem)
+import Emulator.Emulator (run)
+import Emulator.State (Memory, PC, Registers, setMem)
 import Instructions (Size, size)
 
 bsChunks :: Int64 -> ByteString -> [ByteString]
@@ -39,9 +40,12 @@ main = do
   e <- elfContents "/home/dvir/code/riscv/hello"
   case e of
     Left err -> error $ "error getting elf contents: " <> unpack err
-    Right b -> do
-      let c = code b
-      print c
-      let w = concatMap (fromMaybe undefined . asBytesLE (knownNat @Size)) c
-      let mem = setMem initMem (zero (knownNat @Size)) w
-      mapM_ (print . \s -> (snd3 s, thd3 s)) $ run (mem, initRegs, initPC)
+    Right elf -> do
+      let bytes =
+            concatMap
+              (fromMaybe undefined . asBytesLE (knownNat @Size))
+              $ code elf
+      let mem = setMem initMem (zero (knownNat @Size)) bytes
+      s <- run (mem, initRegs, initPC)
+      print $ snd3 $ last s
+      print $ thd3 $ last s

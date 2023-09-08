@@ -1,14 +1,17 @@
 # Haskell RISC-V Emulator
 
 ## Installing
+```
 $ cabal install
+```
 
 ## Usage
 ```
 $ cabal run haskell-riscv-emulator <path_to_elf_executable>
 ```
+
 ## Example
-Save the following code to a file named ```hello.s```:
+Save the following to a file named ```hello.s```:
 ```
 .global _start
 
@@ -27,13 +30,13 @@ helloworld:
   .ascii "Hello World\n"
 ```
 
-Now assemble and link the code with:
+Now assemble and link with:
 ```
 $ riscv64-linux-gnu-as hello.s -o hello.o
 $ riscv64-linux-gnu-gcc -o hello hello.o -nostdlib -static
 ```
 
-This produces the exacutable ```hello```.
+This produces the executable ```hello```.
 Now run:
 ```
 $ cabal run haskell-riscv-emulator hello

@@ -14,6 +14,7 @@ import Elf.Types (Elf (..))
 import Emulator.Emulator (run)
 import Emulator.State (Memory, PC, Params (Params, endianness), Registers, setMem)
 import Instructions (Size, size)
+import System.Environment (getArgs)
 import Types
 
 bsChunks :: Int64 -> ByteString -> [ByteString]
@@ -42,7 +43,8 @@ initPC = zero $ knownNat @Size
 
 main :: IO ()
 main = do
-  e <- elfContents "/home/dvir/code/riscv/hello"
+  args <- getArgs
+  e <- elfContents $ head args
   case e of
     Left err -> error $ "error getting elf contents: " <> unpack err
     Right elf@(Elf _ d _) -> do
